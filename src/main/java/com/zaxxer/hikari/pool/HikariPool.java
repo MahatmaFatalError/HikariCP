@@ -30,6 +30,11 @@ import com.zaxxer.hikari.util.ConcurrentBag.IBagStateListener;
 import com.zaxxer.hikari.util.SuspendResumeLock;
 import com.zaxxer.hikari.util.UtilityElf.DefaultThreadFactory;
 import io.micrometer.core.instrument.MeterRegistry;
+import io.opencensus.common.Scope;
+import io.opencensus.trace.Span;
+import io.opencensus.trace.Tracing;
+import io.opencensus.trace.samplers.Samplers;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -175,23 +180,29 @@ public final class HikariPool extends PoolBase implements HikariPoolMXBean, IBag
 
       try {
          long timeout = hardTimeout;
-         do {
-            PoolEntry poolEntry = connectionBag.borrow(timeout, MILLISECONDS);
-            if (poolEntry == null) {
-               break; // We timed out... break and throw exception
-            }
 
-            final long now = currentTime();
-            if (poolEntry.isMarkedEvicted() || (elapsedMillis(poolEntry.lastAccessed, now) > aliveBypassWindowMs && !isConnectionAlive(poolEntry.connection))) {
-               closeConnection(poolEntry, poolEntry.isMarkedEvicted() ? EVICTED_CONNECTION_MESSAGE : DEAD_CONNECTION_MESSAGE);
-               timeout = hardTimeout - elapsedMillis(startTime);
-            }
-            else {
-               metricsTracker.recordBorrowStats(poolEntry, startTime);
-               return poolEntry.createProxyConnection(leakTaskFactory.schedule(poolEntry), now);
-            }
-         } while (timeout > 0L);
+         Span span = Tracing.getTracer().spanBuilder("acquiring db connection from HikariCP").setRecordEvents(true).setSampler(Samplers.alwaysSample()).startSpan();
+     	 try (Scope ws = Tracing.getTracer().withSpan(span)) {
+	         do {
 
+	        	PoolEntry poolEntry = connectionBag.borrow(timeout, MILLISECONDS);
+	            if (poolEntry == null) {
+	               break; // We timed out... break and throw exception
+	            }
+
+	            final long now = currentTime();
+	            if (poolEntry.isMarkedEvicted() || (elapsedMillis(poolEntry.lastAccessed, now) > aliveBypassWindowMs && !isConnectionAlive(poolEntry.connection))) {
+	               closeConnection(poolEntry, poolEntry.isMarkedEvicted() ? EVICTED_CONNECTION_MESSAGE : DEAD_CONNECTION_MESSAGE);
+	               timeout = hardTimeout - elapsedMillis(startTime);
+	            }
+	            else {
+	               metricsTracker.recordBorrowStats(poolEntry, startTime);
+	               return poolEntry.createProxyConnection(leakTaskFactory.schedule(poolEntry), now);
+	            }
+	         } while (timeout > 0L);
+     	 } finally {
+ 			span.end();
+ 		 }
          metricsTracker.recordBorrowTimeoutStats(startTime);
          throw createTimeoutException(startTime);
       }

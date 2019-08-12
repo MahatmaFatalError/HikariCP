@@ -25,11 +25,12 @@
       <commons.csv.version>1.5</commons.csv.version>
       <h2.version>1.4.196</h2.version>
       <junit.version>4.12</junit.version>
+      <io-opencensus.version>0.23.0</io-opencensus.version>
    </properties>
 
    <groupId>com.zaxxer</groupId>
    <artifactId>HikariCP</artifactId>
-   <version>3.3.2-SNAPSHOT</version>
+   <version>3.3.2-OPENCENSUS</version>
    <packaging>bundle</packaging>
 
    <name>HikariCP</name>
@@ -171,6 +172,11 @@
          <optional>true</optional>
       </dependency>
       <dependency>
+		<groupId>io.opencensus</groupId>
+		<artifactId>opencensus-api</artifactId>
+		<version>${io-opencensus.version}</version>
+	  </dependency>
+      <dependency>
          <groupId>io.prometheus</groupId>
          <artifactId>simpleclient</artifactId>
          <version>${simpleclient.version}</version>
@@ -248,10 +254,10 @@
             <groupId>org.codehaus.mojo</groupId>
             <artifactId>exec-maven-plugin</artifactId>
             <version>1.6.0</version>
-            <executions>
+             <executions>
                <execution>
                   <phase>compile</phase>
-                  <!-- phase>generate-test-sources</phase -->
+                  <!-- <phase>generate-test-sources</phase -->
                   <goals>
                      <goal>java</goal>
                   </goals>
